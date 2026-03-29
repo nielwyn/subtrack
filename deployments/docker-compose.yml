@@ -1,0 +1,57 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: inventory-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: inventory_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - inventory-network
+
+  # Go API Service
+  api:
+    build:
+      context: ..
+      dockerfile: deployments/docker/Dockerfile
+    container_name: inventory-api
+    environment:
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: 8080
+      GIN_MODE: release
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: inventory_db
+      DB_SSLMODE: disable
+      JWT_SECRET: your-super-secret-jwt-key-change-this-in-production
+      JWT_EXPIRY_HOURS: 24
+      LOG_LEVEL: info
+      LOG_ENCODING: json
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - inventory-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  inventory-network:
+    driver: bridge
