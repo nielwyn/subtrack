@@ -8,13 +8,14 @@ import (
 
 type Subscription struct {
 	ID           uint           `gorm:"primaryKey" json:"id"`
+	UserID       uint           `gorm:"not null;index" json:"user_id"`
 	Name         string         `gorm:"not null" json:"name"`
 	Vendor       string         `gorm:"not null" json:"vendor"`
-	Plan         string         `json:"plan"`
+	Platform     string         `gorm:"not null" json:"platform"`
 	BillingCycle string         `gorm:"not null;default:'monthly'" json:"billing_cycle"` // monthly, annual
-	CostPerSeat  float64        `gorm:"not null;default:0" json:"cost_per_seat"`
-	Seats        int            `gorm:"not null;default:1" json:"seats"`
-	CurrentUsers int            `gorm:"not null;default:0" json:"current_users"`
+	Amount       float64        `gorm:"not null;default:0" json:"amount"`
+	Currency     string         `gorm:"not null;default:'USD'" json:"currency"`
+	Category     string         `json:"category"`
 	AutoRenews   bool           `gorm:"not null;default:true" json:"auto_renews"`
 	RenewalDate  *time.Time     `json:"renewal_date"`
 	Status       string         `gorm:"not null;default:'active'" json:"status"` // active, trial, cancelled
@@ -31,11 +32,11 @@ func (Subscription) TableName() string {
 type CreateSubscriptionRequest struct {
 	Name         string     `json:"name" binding:"required,min=1,max=200"`
 	Vendor       string     `json:"vendor" binding:"required,min=1,max=100"`
-	Plan         string     `json:"plan" binding:"max=100"`
+	Platform     string     `json:"platform" binding:"required,min=1,max=100"`
 	BillingCycle string     `json:"billing_cycle" binding:"required,oneof=monthly annual"`
-	CostPerSeat  float64    `json:"cost_per_seat" binding:"non_negative"`
-	Seats        int        `json:"seats" binding:"positive"`
-	CurrentUsers int        `json:"current_users" binding:"non_negative"`
+	Amount       float64    `json:"amount" binding:"non_negative"`
+	Currency     string     `json:"currency" binding:"omitempty,len=3"`
+	Category     string     `json:"category" binding:"max=100"`
 	AutoRenews   bool       `json:"auto_renews"`
 	RenewalDate  *time.Time `json:"renewal_date"`
 	Status       string     `json:"status" binding:"omitempty,oneof=active trial cancelled"`
@@ -45,11 +46,11 @@ type CreateSubscriptionRequest struct {
 type UpdateSubscriptionRequest struct {
 	Name         *string    `json:"name" binding:"omitempty,min=1,max=200"`
 	Vendor       *string    `json:"vendor" binding:"omitempty,min=1,max=100"`
-	Plan         *string    `json:"plan" binding:"omitempty,max=100"`
+	Platform     *string    `json:"platform" binding:"omitempty,min=1,max=100"`
 	BillingCycle *string    `json:"billing_cycle" binding:"omitempty,oneof=monthly annual"`
-	CostPerSeat  *float64   `json:"cost_per_seat" binding:"omitempty,non_negative"`
-	Seats        *int       `json:"seats" binding:"omitempty,positive"`
-	CurrentUsers *int       `json:"current_users" binding:"omitempty,non_negative"`
+	Amount       *float64   `json:"amount" binding:"omitempty,non_negative"`
+	Currency     *string    `json:"currency" binding:"omitempty,len=3"`
+	Category     *string    `json:"category" binding:"omitempty,max=100"`
 	AutoRenews   *bool      `json:"auto_renews"`
 	RenewalDate  *time.Time `json:"renewal_date"`
 	Status       *string    `json:"status" binding:"omitempty,oneof=active trial cancelled"`
@@ -60,12 +61,13 @@ type SubscriptionQuery struct {
 	Page         int     `form:"page"`
 	Limit        int     `form:"limit"`
 	Vendor       string  `form:"vendor"`
+	Platform     string  `form:"platform"`
+	Category     string  `form:"category"`
 	Status       string  `form:"status"`
 	BillingCycle string  `form:"billing_cycle"`
-	MinCost      float64 `form:"min_cost"`
-	MaxCost      float64 `form:"max_cost"`
-	LowCapacity  int     `form:"low_capacity"`   // subscriptions where (seats - current_users) <= this
-	RenewingSoon int     `form:"renewing_soon"`  // renewing within N days
+	MinAmount    float64 `form:"min_amount"`
+	MaxAmount    float64 `form:"max_amount"`
+	RenewingSoon int     `form:"renewing_soon"` // renewing within N days
 }
 
 type PaginatedSubscriptions struct {

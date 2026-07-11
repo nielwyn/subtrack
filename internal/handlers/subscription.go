@@ -24,13 +24,20 @@ func NewSubscriptionHandler(subscriptionService service.SubscriptionService) *Su
 }
 
 func (h *SubscriptionHandler) CreateSubscription(c *gin.Context) {
+	userID, ok := getUserID(c)
+	if !ok {
+		logger.Error("user_id missing or invalid in context")
+		response.Error(c, http.StatusInternalServerError, apierrors.CodeInternal, "Authentication context error")
+		return
+	}
+
 	var req models.CreateSubscriptionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, http.StatusBadRequest, apierrors.CodeInvalidInput, validator.FormatValidationError(err))
 		return
 	}
 
-	sub, err := h.subscriptionService.CreateSubscription(&req)
+	sub, err := h.subscriptionService.CreateSubscription(userID, &req)
 	if err != nil {
 		logger.Error("Failed to create subscription", zap.Error(err))
 		response.Error(c, http.StatusInternalServerError, apierrors.CodeInternal, "Failed to create subscription")
@@ -41,13 +48,20 @@ func (h *SubscriptionHandler) CreateSubscription(c *gin.Context) {
 }
 
 func (h *SubscriptionHandler) GetAllSubscriptions(c *gin.Context) {
+	userID, ok := getUserID(c)
+	if !ok {
+		logger.Error("user_id missing or invalid in context")
+		response.Error(c, http.StatusInternalServerError, apierrors.CodeInternal, "Authentication context error")
+		return
+	}
+
 	var query models.SubscriptionQuery
 	if err := c.ShouldBindQuery(&query); err != nil {
 		response.Error(c, http.StatusBadRequest, apierrors.CodeInvalidInput, validator.FormatValidationError(err))
 		return
 	}
 
-	result, err := h.subscriptionService.GetAllSubscriptions(query)
+	result, err := h.subscriptionService.GetAllSubscriptions(userID, query)
 	if err != nil {
 		logger.Error("Failed to retrieve subscriptions", zap.Error(err))
 		response.Error(c, http.StatusInternalServerError, apierrors.CodeInternal, "Failed to retrieve subscriptions")
@@ -58,13 +72,20 @@ func (h *SubscriptionHandler) GetAllSubscriptions(c *gin.Context) {
 }
 
 func (h *SubscriptionHandler) GetSubscriptionByID(c *gin.Context) {
+	userID, ok := getUserID(c)
+	if !ok {
+		logger.Error("user_id missing or invalid in context")
+		response.Error(c, http.StatusInternalServerError, apierrors.CodeInternal, "Authentication context error")
+		return
+	}
+
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		response.Error(c, http.StatusBadRequest, apierrors.CodeInvalidInput, "Invalid subscription ID")
 		return
 	}
 
-	sub, err := h.subscriptionService.GetSubscriptionByID(uint(id))
+	sub, err := h.subscriptionService.GetSubscriptionByID(userID, uint(id))
 	if err != nil {
 		if errors.Is(err, service.ErrSubscriptionNotFound) {
 			response.Error(c, http.StatusNotFound, apierrors.CodeNotFound, err.Error())
@@ -79,6 +100,13 @@ func (h *SubscriptionHandler) GetSubscriptionByID(c *gin.Context) {
 }
 
 func (h *SubscriptionHandler) UpdateSubscription(c *gin.Context) {
+	userID, ok := getUserID(c)
+	if !ok {
+		logger.Error("user_id missing or invalid in context")
+		response.Error(c, http.StatusInternalServerError, apierrors.CodeInternal, "Authentication context error")
+		return
+	}
+
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		response.Error(c, http.StatusBadRequest, apierrors.CodeInvalidInput, "Invalid subscription ID")
@@ -91,7 +119,7 @@ func (h *SubscriptionHandler) UpdateSubscription(c *gin.Context) {
 		return
 	}
 
-	sub, err := h.subscriptionService.UpdateSubscription(uint(id), &req)
+	sub, err := h.subscriptionService.UpdateSubscription(userID, uint(id), &req)
 	if err != nil {
 		if errors.Is(err, service.ErrSubscriptionNotFound) {
 			response.Error(c, http.StatusNotFound, apierrors.CodeNotFound, err.Error())
@@ -106,13 +134,20 @@ func (h *SubscriptionHandler) UpdateSubscription(c *gin.Context) {
 }
 
 func (h *SubscriptionHandler) DeleteSubscription(c *gin.Context) {
+	userID, ok := getUserID(c)
+	if !ok {
+		logger.Error("user_id missing or invalid in context")
+		response.Error(c, http.StatusInternalServerError, apierrors.CodeInternal, "Authentication context error")
+		return
+	}
+
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		response.Error(c, http.StatusBadRequest, apierrors.CodeInvalidInput, "Invalid subscription ID")
 		return
 	}
 
-	if err := h.subscriptionService.DeleteSubscription(uint(id)); err != nil {
+	if err := h.subscriptionService.DeleteSubscription(userID, uint(id)); err != nil {
 		if errors.Is(err, service.ErrSubscriptionNotFound) {
 			response.Error(c, http.StatusNotFound, apierrors.CodeNotFound, err.Error())
 			return
@@ -123,4 +158,13 @@ func (h *SubscriptionHandler) DeleteSubscription(c *gin.Context) {
 	}
 
 	response.Success(c, http.StatusOK, "Subscription deleted successfully", nil)
+}
+
+func getUserID(c *gin.Context) (uint, bool) {
+	val, exists := c.Get("user_id")
+	if !exists {
+		return 0, false
+	}
+	userID, ok := val.(uint)
+	return userID, ok
 }

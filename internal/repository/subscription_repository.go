@@ -10,10 +10,10 @@ import (
 
 type SubscriptionRepository interface {
 	Create(sub *models.Subscription) error
-	FindAll(query models.SubscriptionQuery) ([]models.Subscription, int64, error)
-	FindByID(id uint) (*models.Subscription, error)
+	FindAll(userID uint, query models.SubscriptionQuery) ([]models.Subscription, int64, error)
+	FindByID(userID, id uint) (*models.Subscription, error)
 	Update(sub *models.Subscription) error
-	Delete(id uint) error
+	Delete(userID, id uint) error
 }
 
 type subscriptionRepository struct {
@@ -28,14 +28,20 @@ func (r *subscriptionRepository) Create(sub *models.Subscription) error {
 	return r.db.Create(sub).Error
 }
 
-func (r *subscriptionRepository) FindAll(query models.SubscriptionQuery) ([]models.Subscription, int64, error) {
+func (r *subscriptionRepository) FindAll(userID uint, query models.SubscriptionQuery) ([]models.Subscription, int64, error) {
 	var subs []models.Subscription
 	var total int64
 
-	db := r.db.Model(&models.Subscription{})
+	db := r.db.Model(&models.Subscription{}).Where("user_id = ?", userID)
 
 	if query.Vendor != "" {
 		db = db.Where("vendor = ?", query.Vendor)
+	}
+	if query.Platform != "" {
+		db = db.Where("platform = ?", query.Platform)
+	}
+	if query.Category != "" {
+		db = db.Where("category = ?", query.Category)
 	}
 	if query.Status != "" {
 		db = db.Where("status = ?", query.Status)
@@ -43,14 +49,11 @@ func (r *subscriptionRepository) FindAll(query models.SubscriptionQuery) ([]mode
 	if query.BillingCycle != "" {
 		db = db.Where("billing_cycle = ?", query.BillingCycle)
 	}
-	if query.MinCost > 0 {
-		db = db.Where("cost_per_seat >= ?", query.MinCost)
+	if query.MinAmount > 0 {
+		db = db.Where("amount >= ?", query.MinAmount)
 	}
-	if query.MaxCost > 0 {
-		db = db.Where("cost_per_seat <= ?", query.MaxCost)
-	}
-	if query.LowCapacity > 0 {
-		db = db.Where("(seats - current_users) <= ?", query.LowCapacity)
+	if query.MaxAmount > 0 {
+		db = db.Where("amount <= ?", query.MaxAmount)
 	}
 	if query.RenewingSoon > 0 {
 		deadline := time.Now().AddDate(0, 0, query.RenewingSoon)
@@ -66,9 +69,9 @@ func (r *subscriptionRepository) FindAll(query models.SubscriptionQuery) ([]mode
 	return subs, total, err
 }
 
-func (r *subscriptionRepository) FindByID(id uint) (*models.Subscription, error) {
+func (r *subscriptionRepository) FindByID(userID, id uint) (*models.Subscription, error) {
 	var sub models.Subscription
-	err := r.db.First(&sub, id).Error
+	err := r.db.Where("user_id = ?", userID).First(&sub, id).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
@@ -82,6 +85,6 @@ func (r *subscriptionRepository) Update(sub *models.Subscription) error {
 	return r.db.Save(sub).Error
 }
 
-func (r *subscriptionRepository) Delete(id uint) error {
-	return r.db.Delete(&models.Subscription{}, id).Error
+func (r *subscriptionRepository) Delete(userID, id uint) error {
+	return r.db.Where("user_id = ?", userID).Delete(&models.Subscription{}, id).Error
 }
